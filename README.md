@@ -1,230 +1,150 @@
-# Customer-Risk-Segmentation
+# Money Mule Detection & Financial Fraud Analytics
+
+Graph-based financial fraud detection system for identifying suspicious transactions, money mule accounts, and fraud communities using anomaly detection and network analytics.
 
 ## Overview
 
-This project builds an industry-style Customer Risk Segmentation system for the banking and finance domain.
+This project combines:
+- Unsupervised fraud detection
+- Behavioral feature engineering
+- Transaction network analysis
+- Community detection
+- Financial risk analytics
 
-The goal is to group customers into different risk categories using:
-- customer income,
-- loan details,
-- debt ratios,
-- credit history,
-- financial behavior.
-
-The project uses:
-- data preprocessing,
-- feature engineering,
-- KMeans clustering,
-- PCA visualization.
+The system uses Isolation Forest for anomaly detection and NetworkX for graph-based fraud investigation. :contentReference[oaicite:0]{index=0}
 
 ---
 
-# Objective
+## Key Features
 
-The main objective is to:
-
-- identify risky customers,
-- group similar borrowers,
-- improve credit decision making,
-- support portfolio monitoring.
-
----
-
-# Workflow
-
-```text
-Raw Customer Data
-        ↓
-Data Cleaning
-        ↓
-Feature Engineering
-        ↓
-Preprocessing
-        ↓
-Feature Scaling & Encoding
-        ↓
-KMeans Clustering
-        ↓
-Customer Risk Segmentation
-        ↓
-PCA Visualization
-        ↓
-Business Interpretation
-```
+- Fraud transaction analysis
+- Behavioral risk feature engineering
+- Isolation Forest anomaly detection
+- PCA-based anomaly visualization
+- Money mule hub detection
+- Fraud community detection
+- Transaction network analysis
+- Lifecycle-based risk segmentation
 
 ---
 
-# Dataset Features
+## Tech Stack
 
-| Feature | Description |
-|---|---|
-| ApplicantIncome | Applicant income |
-| CoapplicantIncome | Co-applicant income |
-| LoanAmount | Loan amount |
-| Loan_Amount_Term | Loan duration |
-| Credit_History | Credit repayment history |
-| Gender | Gender |
-| Married | Marital status |
-| Education | Education level |
-| Self_Employed | Employment status |
-| Property_Area | Area category |
-
----
-
-# Feature Engineering
-
-Additional financial risk features created:
-
-| Feature | Purpose |
-|---|---|
-| Total_Income | Combined income |
-| Estimated_EMI | Estimated repayment burden |
-| DTI_Ratio | Debt-to-Income ratio |
-| Loan_Income_Ratio | Loan burden relative to income |
-| Low_Credit_History | Weak credit history indicator |
-
----
-
-# Technologies Used
-
-## Language
+### Programming & Analytics
 - Python
+- Pandas
+- NumPy
 
-## Libraries
-- pandas
-- numpy
-- matplotlib
-- seaborn
-- scikit-learn
+### Machine Learning
+- Scikit-learn
+- Isolation Forest
+- PCA
 
----
+### Visualization
+- Matplotlib
+- Seaborn
 
-# Machine Learning Techniques
-
-## KMeans Clustering
-Used for:
-- customer grouping,
-- risk segmentation.
-
-## PCA (Principal Component Analysis)
-Used for:
-- cluster visualization,
-- dimensionality reduction.
-
-## Silhouette Score
-Used for:
-- evaluating cluster quality.
+### Graph Analytics
+- NetworkX
 
 ---
 
-# Preprocessing Pipeline
+## Features Engineered
 
-## Numeric Features
-- Median Imputation
-- Standard Scaling
-
-## Categorical Features
-- Most Frequent Imputation
-- One-Hot Encoding
-
----
-
-# Risk Segments
-
-The model creates customer groups such as:
-
-| Segment | Meaning |
-|---|---|
-| Low Risk Customers | Financially stable |
-| Medium Risk Customers | Moderate risk |
-| High Risk Customers | Higher repayment risk |
-| Very High Risk Customers | Weak financial profile |
+- Balance Drain Detection
+- Transaction Velocity
+- Amount-to-Balance Ratio
+- Large Transaction Detection
+- Destination Balance Change
+- Unique Counterparty Analysis
+- Average Transaction Amount
 
 ---
 
-# Industry Use Cases
-
-- Credit Risk Assessment
-- Loan Approval Analysis
-- Customer Portfolio Monitoring
-- Risk-Based Loan Pricing
-- Collection Strategy
-- Banking Analytics
-
----
-
-# How to Run the Project
-
-## 1. Clone Repository
-
-```bash
-git clone <repository-url>
-```
-
-## 2. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## 3. Add Dataset
-
-Place:
+## Workflow
 
 ```text
-loan_dataset.csv
+Transaction Data
+      ↓
+Data Cleaning
+      ↓
+Feature Engineering
+      ↓
+Anomaly Detection
+      ↓
+Fraud Scoring
+      ↓
+PCA Visualization
+      ↓
+Graph Construction
+      ↓
+Mule Hub Detection
+      ↓
+Community Detection
 ```
 
-inside the project folder.
+---
 
-## 4. Run Project
+## Model Evaluation
+
+Metrics used:
+- ROC-AUC Score
+- Confusion Matrix
+- Classification Report
+
+---
+
+## Graph Analytics
+
+Implemented:
+- Betweenness Centrality
+- Community Detection
+- Transaction Network Visualization
+
+Used for:
+- detecting mule hubs
+- identifying suspicious transaction communities
+- analyzing fraud networks
+
+---
+
+## Dataset
+
+Dataset:
+```text
+PS_20174392719_1491204439457_log.csv
+```
+
+Contains:
+- transaction details
+- sender/receiver accounts
+- balances
+- fraud labels
+- transaction types
+
+---
+
+## How to Run
+
+### Install Dependencies
 
 ```bash
-python customer_risk_segmentation.py
+pip install pandas numpy matplotlib seaborn scikit-learn networkx
+```
+
+### Run Project
+
+```bash
+python fraud_detection.py
 ```
 
 ---
 
-# Expected Outputs
+## Future Improvements
 
-The project generates:
-- customer risk clusters,
-- PCA visualization plots,
-- segment summary tables,
-- risk labels.
-
----
-
-# Example Business Interpretation
-
-## Low Risk Customers
-- strong income,
-- low debt burden,
-- good credit history.
-
-## High Risk Customers
-- weaker income,
-- high leverage,
-- poor credit history.
-
----
-
-# Future Improvements
-
-Possible enhancements:
-- DBSCAN clustering
-- Gaussian Mixture Models
-- Autoencoder-based clustering
-- Behavioral scoring
-- Real-time risk monitoring
-- Explainable AI (SHAP)
-
----
-
-# Conclusion
-
-This project demonstrates an industry-style implementation of Customer Risk Segmentation in Banking & Finance using:
-- financial feature engineering,
-- clustering techniques,
-- preprocessing pipelines,
-- and business risk interpretation.
+- Graph Neural Networks (GNNs)
+- Real-time fraud detection
+- Explainable AI for fraud analysis
+- Neo4j graph integration
+- Deep anomaly detection
+```
