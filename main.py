@@ -3,235 +3,153 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
-
-
 import matplotlib.pyplot as plt
 import seaborn as sns
+import networkx as nx
 
-
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import (
-    StandardScaler,
-    OneHotEncoder
-)
-
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-
-from sklearn.cluster import KMeans
-
-from sklearn.metrics import silhouette_score
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import IsolationForest
 from sklearn.decomposition import PCA
+from sklearn.metrics import (classification_report,confusion_matrix,roc_auc_score,roc_curve)
 
+df = pd.read_csv("PS_20174392719_1491204439457_log.csv")
 
-df = pd.read_csv("loan_dataset.csv")
+fraud_type = df.groupby('type')['isFraud'].mean() * 100
 
-df.columns = df.columns.str.strip()
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-print(df.shape)
+df['type'].value_counts().plot(kind='bar', ax=axes[0], color='steelblue')
+axes[0].set_title("Transaction Type Distribution")
+fraud_by_type.plot(kind='bar', ax=axes[1], color='crimson')
+axes[1].set_title("Fraud Rate by Transaction Type (%)")
+plt.tight_layout()
+plt.show()
 
+df = df[df['type'].isin(['TRANSFER', 'CASH_OUT'])].copy()
 
-drop_cols = ["Loan_ID"]
+df['balance_drain']= ((df['newbalanceOrig'] == 0) & (df['oldbalanceOrg'] > 0)).astype(int)
+df['amount_to_balance_ratio']= df['amount'] / (df['oldbalanceOrg'] + 1)
+df['dest_balance_change'] = df['newbalanceDest'] - df['oldbalanceDest']
+df['zero_origin_balance']= (df['oldbalanceOrg'] == 0).astype(int)
+df['large_transaction'] = (df['amount'] > 200000).astype(int)
 
-for col in drop_cols:
-    if col in df.columns:
-        df.drop(columns=col, inplace=True)
+df = df.merge(df.groupby('nameOrig')['step'].count().reset_index().rename(columns={'step': 'transaction_velocity'}), on='nameOrig', how='left')
+df = df.merge(df.groupby('nameOrig')['nameDest'].nunique().reset_index().rename(columns={'nameDest': 'unique_counterparties'}), on='nameOrig', how='left')
+df = df.merge(df.groupby('nameOrig')['amount'].mean().reset_index().rename(columns={'amount': 'avg_transaction_amount'}), on='nameOrig', how='left')
 
+def assign_lifecycle(step):
+    if step <= 30:   return 'Onboarding'
+    elif step <= 90: return 'Early_Stage'
+    else:            return 'Portfolio'
 
-df["Total_Income"] = (
-    df["ApplicantIncome"].fillna(0)
-    + df["CoapplicantIncome"].fillna(0)
-)
+df['lifecycle_stage'] = df['step'].apply(assign_lifecycle)
 
-df["Estimated_EMI"] = (
-    df["LoanAmount"].fillna(df["LoanAmount"].median())
-    / df["Loan_Amount_Term"].fillna(360)
-)
-
-
-df["DTI_Ratio"] = (
-    df["Estimated_EMI"]
-    / (df["Total_Income"] + 1)
-)
-
-
-df["Loan_Income_Ratio"] = (
-    df["LoanAmount"].fillna(0)
-    / (df["Total_Income"] + 1)
-)
-
-
-df["Low_Credit_History"] = np.where(
-    df["Credit_History"] == 0,
-    1,
-    0
-)
-
-numeric_features = [
-    "ApplicantIncome",
-    "CoapplicantIncome",
-    "LoanAmount",
-    "Loan_Amount_Term",
-    "Credit_History",
-    "Total_Income",
-    "Estimated_EMI",
-    "DTI_Ratio",
-    "Loan_Income_Ratio"
+feature_cols = [
+    'amount', 'oldbalanceOrg', 'newbalanceOrig',
+    'oldbalanceDest', 'newbalanceDest',
+    'balance_drain', 'amount_to_balance_ratio',
+    'dest_balance_change', 'zero_origin_balance',
+    'large_transaction', 'transaction_velocity',
+    'unique_counterparties', 'avg_transaction_amount'
 ]
 
-categorical_features = [
-    "Gender",
-    "Married",
-    "Dependents",
-    "Education",
-    "Self_Employed",
-    "Property_Area"
-]
+X = df[feature_cols].replace([np.inf, -np.inf], np.nan)
+X = X.fillna(X.median())
+y = df['isFraud']
 
+X_scaled = StandardScaler().fit_transform(X)
 
-for col in numeric_features:
-    df[col] = pd.to_numeric(df[col], errors="coerce")
+iso = IsolationForest(n_estimators=200, contamination=0.02, random_state=42, n_jobs=-1)
+iso.fit(X_scaled)
 
-for col in categorical_features:
-    df[col] = df[col].astype("category")
+df['anomaly_score'] = iso.decision_function(X_scaled)
+df['is_anomaly']    = (iso.predict(X_scaled) == -1).astype(int)
 
+print(classification_report(y, df['is_anomaly']))
 
-numeric_pipeline = Pipeline([
-    ("imputer", SimpleImputer(strategy="median")),
-    ("scaler", StandardScaler())
-])
+roc_auc = roc_auc_score(y, -df['anomaly_score'])
+print(f"ROC-AUC: {roc_auc:.4f}")
 
+fpr, tpr, _ = roc_curve(y, -df['anomaly_score'])
 
-categorical_pipeline = Pipeline([
-    ("imputer", SimpleImputer(strategy="most_frequent")),
-    ("encoder", OneHotEncoder(handle_unknown="ignore"))
-])
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-preprocessor = ColumnTransformer([
-    ("num", numeric_pipeline, numeric_features),
-    ("cat", categorical_pipeline, categorical_features)
-])
+axes[0].plot(fpr, tpr, color='crimson', label=f'AUC = {roc_auc:.4f}')
+axes[0].plot([0,1],[0,1],'k--')
+axes[0].set_title("ROC Curve")
+axes[0].legend()
 
+sns.heatmap(confusion_matrix(y, df['is_anomaly']), annot=True, fmt='d',
+            cmap='Reds', ax=axes[1],
+            xticklabels=['Normal','Fraud'],
+            yticklabels=['Normal','Fraud'])
+axes[1].set_title("Confusion Matrix")
 
-X = df[numeric_features + categorical_features]
-
-X_processed = preprocessor.fit_transform(X)
-
-
-inertia_scores = []
-silhouette_scores = []
-
-cluster_range = range(2, 11)
-
-for k in cluster_range:
-
-    model = KMeans(
-        n_clusters=k,
-        random_state=42,
-        n_init=10
-    )
-
-    model.fit(X_processed)
-
-    inertia_scores.append(model.inertia_)
-
-    score = silhouette_score(
-        X_processed,
-        model.labels_
-    )
-
-    silhouette_scores.append(score)
-
-
-plt.figure(figsize=(10, 5))
-
-plt.plot(cluster_range, inertia_scores, marker='o')
-
-plt.title("Elbow Method")
-plt.xlabel("Number of Clusters")
-plt.ylabel("Inertia")
-
-plt.grid(True)
-
+sns.histplot(df[df['isFraud']==0]['anomaly_score'], bins=50, color='steelblue', label='Normal', alpha=0.6, ax=axes[2])
+sns.histplot(df[df['isFraud']==1]['anomaly_score'], bins=50, color='crimson', label='Fraud', alpha=0.6, ax=axes[2])
+axes[2].set_title("Anomaly Score Distribution")
+axes[2].legend()
+plt.tight_layout()
 plt.show()
 
+lifecycle_risk = df.groupby('lifecycle_stage').agg(
+    total_transactions = ('isFraud', 'count'),
+    fraud_cases        = ('isFraud', 'sum'),
+    anomalies_detected = ('is_anomaly', 'sum'),
+    avg_amount         = ('amount', 'mean')
+).assign(fraud_rate=lambda x: (x['fraud_cases'] / x['total_transactions'] * 100).round(2))
 
-plt.figure(figsize=(10, 5))
+print(lifecycle_risk)
 
-plt.plot(cluster_range, silhouette_scores, marker='o')
+X_pca = PCA(n_components=2).fit_transform(X_scaled)
 
-plt.title("Silhouette Scores")
-plt.xlabel("Number of Clusters")
-plt.ylabel("Score")
+pca_df = pd.DataFrame({'PCA_1': X_pca[:,0], 'PCA_2': X_pca[:,1],
+                        'Label': df['is_anomaly'].map({0:'Normal', 1:'Suspected Mule'})})
 
-plt.grid(True)
-
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=pca_df, x='PCA_1', y='PCA_2', hue='Label',
+                palette={'Normal':'steelblue','Suspected Mule':'crimson'}, alpha=0.5)
+plt.title("PCA — Normal vs Suspected Mule Accounts")
+plt.tight_layout()
 plt.show()
 
+sample_df = df[df['is_anomaly'] == 1].sample(min(500, df['is_anomaly'].sum()), random_state=42)
 
-optimal_k = 4
+G = nx.DiGraph()
+for _, row in sample_df.iterrows():
+    G.add_edge(row['nameOrig'], row['nameDest'], weight=row['amount'])
 
-kmeans = KMeans(
-    n_clusters=optimal_k,
-    random_state=42,
-    n_init=10
-)
+betweenness = nx.betweenness_centrality(G, k=100)
 
-clusters = kmeans.fit_predict(X_processed)
+centrality_df = pd.DataFrame({
+    'account'              : list(betweenness.keys()),
+    'betweenness_centrality': list(betweenness.values())
+}).sort_values('betweenness_centrality', ascending=False)
 
-df["Customer_Risk_Segment"] = clusters
+print("\nTop 10 Suspected Mule Hubs:")
+print(centrality_df.head(10))
 
+communities = nx.community.greedy_modularity_communities(G.to_undirected())
+print(f"\nMule Communities Detected : {len(communities)}")
+print(f"Largest Network Size      : {max(len(c) for c in communities)} accounts")
 
-pca = PCA(n_components=2)
-
-X_pca = pca.fit_transform(X_processed)
-
-pca_df = pd.DataFrame({
-    "PCA_1": X_pca[:, 0],
-    "PCA_2": X_pca[:, 1],
-    "Cluster": clusters
-})
-
-plt.figure(figsize=(10, 7))
-
-sns.scatterplot(
-    data=pca_df,
-    x="PCA_1",
-    y="PCA_2",
-    hue="Cluster",
-    palette="Set1"
-)
-
-plt.title("Customer Risk Segmentation")
-
+plt.figure(figsize=(14, 10))
+pos = nx.spring_layout(G, seed=42, k=0.5)
+node_colors = ['crimson' if betweenness.get(n, 0) > 0.05 else 'steelblue' for n in G.nodes()]
+nx.draw_networkx(G, pos, node_color=node_colors, node_size=30,
+                 edge_color='gray', alpha=0.6, with_labels=False, arrows=True, arrowsize=5)
+plt.title("Money Mule Transaction Network | Red = Mule Hub  Blue = Normal")
+plt.axis('off')
+plt.tight_layout()
 plt.show()
 
-
-segment_summary = df.groupby(
-    "Customer_Risk_Segment"
-)[[
-    "ApplicantIncome",
-    "LoanAmount",
-    "Total_Income",
-    "DTI_Ratio",
-    "Loan_Income_Ratio",
-    "Credit_History"
-]].mean()
-
-print(segment_summary)
-
-
-risk_mapping = {
-    0: "Low Risk Customers",
-    1: "Medium Risk Customers",
-    2: "High Risk Customers",
-    3: "Very High Risk Customers"
-}
-
-df["Risk_Label"] = df[
-    "Customer_Risk_Segment"
-].map(risk_mapping)
-
-
-print(df["Risk_Label"].value_counts())
+print(f"""
+Transactions Analysed : {len(df):,}
+Anomalies Detected: {df['is_anomaly'].sum():,}
+Confirmed Fraud Cases : {df['isFraud'].sum():,}
+ROC-AUC Score : {roc_auc:.4f}
+Graph Nodes (Accounts): {G.number_of_nodes():,}
+Graph Edges (Txns): {G.number_of_edges():,}
+Mule Communities : {len(communities)}
+Largest Mule Network: {max(len(c) for c in communities)} accounts
+""")
